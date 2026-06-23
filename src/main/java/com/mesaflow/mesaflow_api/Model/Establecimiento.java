@@ -1,4 +1,5 @@
 package com.mesaflow.mesaflow_api.Model;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -13,16 +14,29 @@ import lombok.Setter;
 @AllArgsConstructor
 public class Establecimiento {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer idEstablecimiento;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  @Column(name = "id_establecimiento")
+  private Integer idEstablecimiento;
 
-    private String nombre;
+  @Column(name = "nombre", nullable = false)
+  private String nombre;
 
-    private String tipo;
+  @Column(name = "tipo", nullable = false)
+  private String tipo;
 
-    private Boolean permiteReserva;
+  @Column(name = "direccion", nullable = false)
+  private String direccion;
 
-    private Boolean activo;
+  @Column(name = "telefono", nullable = false)
+  private String telefono;
+
+  @Column(name = "descripcion", nullable = false)
+  private String descripcion;
+
+  @Column(name = "permite_reserva", nullable = false)
+  private Boolean permiteReserva;
+
+  @Column(name = "activo", nullable = false)
+  private Boolean activo;
 }
-
