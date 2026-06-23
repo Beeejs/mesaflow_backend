@@ -1,0 +1,19 @@
+package com.mesaflow.mesaflow_api.DTOs;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+public class CrearReservaRequest {
+
+  private Integer idUsuario;
+
+  private Integer idEstablecimiento;
+
+  private LocalDateTime fechaHoraInicio;
+
+  private Integer comensales;
+}
