@@ -60,6 +60,15 @@ public class ReservaService {
     LocalDateTime fechaHoraFinCalculada = request.getFechaHoraInicio()
       .plusMinutes(configuracion.getDuracionReservaMinutos());
 
+    // Validar que la nueva reserva no supere el porcentaje máximo de ocupación permitido
+    reservaConfiguracionService.validarOcupacionMaxima(
+      establecimiento.getIdEstablecimiento(),
+      request.getFechaHoraInicio(),
+      fechaHoraFinCalculada,
+      request.getComensales(),
+      configuracion
+    );
+
     // Buscar mesas disponibles automáticamente
     List<Mesa> mesasAsignadas = mesaService.buscarMesasDisponiblesParaReserva(
       establecimiento.getIdEstablecimiento(),
