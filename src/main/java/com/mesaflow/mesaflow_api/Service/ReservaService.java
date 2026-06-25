@@ -12,6 +12,7 @@ import com.mesaflow.mesaflow_api.Model.ReservaMesa;
 import com.mesaflow.mesaflow_api.Model.Usuario;
 import com.mesaflow.mesaflow_api.Repository.ReservaMesaRepository;
 import com.mesaflow.mesaflow_api.Repository.ReservaRepository;
+import com.mesaflow.mesaflow_api.Enums.EstadoReserva;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional; // Importante para manejar transacciones y evitar inconsistencias en la base de datos
 
@@ -138,10 +139,11 @@ public class ReservaService {
 
   // Metodo privado para obtener la descripción del estado de la reserva
   private String obtenerDescripcionEstado(Integer estado) {
-    if (estado == 0) return "PENDIENTE";
-    if (estado == 1) return "CONFIRMADA";
-    if (estado == 2) return "CANCELADA";
-    if (estado == 3) return "NO_SHOW";
+    if (estado == 0) return EstadoReserva.PENDIENTE.name();
+    if (estado == 1) return EstadoReserva.CONFIRMADA.name();
+    if (estado == 2) return EstadoReserva.CANCELADA.name();
+    if (estado == 3) return EstadoReserva.NO_SHOW.name();
+
     return "DESCONOCIDO";
   }
 
