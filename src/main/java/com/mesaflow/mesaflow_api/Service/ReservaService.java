@@ -1,5 +1,7 @@
 package com.mesaflow.mesaflow_api.Service;
 
+import com.mesaflow.mesaflow_api.DTOs.AccionReservaRequest;
+import com.mesaflow.mesaflow_api.DTOs.AccionReservaResponse;
 import com.mesaflow.mesaflow_api.DTOs.CrearReservaRequest;
 import com.mesaflow.mesaflow_api.DTOs.ReservaResponse;
 import com.mesaflow.mesaflow_api.Model.Establecimiento;
@@ -134,6 +136,7 @@ public class ReservaService {
     );
   }
 
+  // Metodo privado para obtener la descripción del estado de la reserva
   private String obtenerDescripcionEstado(Integer estado) {
     if (estado == 0) return "PENDIENTE";
     if (estado == 1) return "CONFIRMADA";
@@ -142,6 +145,7 @@ public class ReservaService {
     return "DESCONOCIDO";
   }
 
+  // Metodo para validar que el usuario no tenga otra reserva activa en el mismo día
   private void validarUsuarioSinReservaActivaEnElDia(
     Integer idUsuario,
     LocalDateTime fechaHoraInicio
@@ -158,5 +162,51 @@ public class ReservaService {
     if (cantidadReservasActivas > 0) {
       throw new RuntimeException("El usuario ya tiene una reserva activa para ese día.");
     }
+  }
+
+  // Metodo para confirmar una reserva (solo para administradores del establecimiento)
+  @Transactional // Asegura que todas las operaciones dentro del método se ejecuten como una sola transacción, evitando inconsistencias en la base de datos
+  // Lo ponemos en publico para que aplique el @Transactional y no de error de proxy
+  public AccionReservaResponse confirmarReserva(Integer idReserva, Integer idUsuario) {
+    // Validar que la reserva exista
+    Reserva reserva = reservaRepository.findById(idReserva)
+      .orElseThrow(() -> new RuntimeException("La reserva no existe."));
+
+    // Validar que el usuario sea administrador del establecimiento de la reserva
+    usuarioService.validarAdminDelEstablecimiento(
+      idUsuario,
+      reserva.getEstablecimiento().getIdEstablecimiento()
+    );
+
+    // Validar que la reserva sea pendiente
+    if (reserva.getEstado() != 0) {
+      throw new RuntimeException("Solo se pueden confirmar reservas pendientes.");
+    }
+
+    // Cambiar estado de la reserva a confirmada
+    reserva.setEstado(1); // 1 = CONFIRMADA
+
+    // Actualizar reserva
+    Reserva reservaGuardada = reservaRepository.save(reserva);
+
+    return new AccionReservaResponse(
+      reservaGuardada.getIdReserva(),
+      reservaGuardada.getEstado(),
+      obtenerDescripcionEstado(reservaGuardada.getEstado())
+    );
+  }
+
+  // Metodo para ejecutar acciones sobre una reserva (confirmar, cancelar)
+  public AccionReservaResponse ejecutarAccionReserva(
+    Integer idReserva,
+    AccionReservaRequest request
+  ) {
+    String scope = request.getScope().trim().toUpperCase();
+
+    if ("CONFIRMAR".equals(scope)) {
+      return confirmarReserva(idReserva, request.getIdUsuario());
+    }
+
+    throw new RuntimeException("La acción indicada no es válida.");
   }
 }
