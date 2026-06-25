@@ -11,6 +11,7 @@ import com.mesaflow.mesaflow_api.Model.Usuario;
 import com.mesaflow.mesaflow_api.Repository.ReservaMesaRepository;
 import com.mesaflow.mesaflow_api.Repository.ReservaRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // Importante para manejar transacciones y evitar inconsistencias en la base de datos
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,6 +46,7 @@ public class ReservaService {
   }
 
   // Crear Reserva
+  @Transactional // Asegura que todas las operaciones dentro del método se ejecuten como una sola transacción, evitando inconsistencias en caso de error (RESERVA, RESERVA_MESA)
   public ReservaResponse crearReserva(CrearReservaRequest request) {
 
     // Validaciones generales
@@ -59,6 +61,12 @@ public class ReservaService {
     // Calcular fecha/hora fin según configuración del establecimiento
     LocalDateTime fechaHoraFinCalculada = request.getFechaHoraInicio()
       .plusMinutes(configuracion.getDuracionReservaMinutos());
+
+    // Validar que el usuario no tenga otra reserva activa en el mismo día
+    validarUsuarioSinReservaActivaEnElDia(
+      usuario.getIdUsuario(),
+      request.getFechaHoraInicio()
+    );
 
     // Validar que la nueva reserva no supere el porcentaje máximo de ocupación permitido
     reservaConfiguracionService.validarOcupacionMaxima(
@@ -90,7 +98,7 @@ public class ReservaService {
     reserva.setFechaHoraInicio(request.getFechaHoraInicio());
     reserva.setFechaHoraFinCalculada(fechaHoraFinCalculada);
     reserva.setComensales(request.getComensales());
-    reserva.setEstado(1); // 1 = CONFIRMADA
+    reserva.setEstado(0); // 0 = PENDIENTE | Por defautl la reserva es pendiente. El admin debe confirmarla
     reserva.setFechaCreacion(LocalDateTime.now());
 
     // Guardar reserva
@@ -130,8 +138,25 @@ public class ReservaService {
     if (estado == 0) return "PENDIENTE";
     if (estado == 1) return "CONFIRMADA";
     if (estado == 2) return "CANCELADA";
-    if (estado == 3) return "FINALIZADA";
-    if (estado == 4) return "NO_SHOW";
+    if (estado == 3) return "NO_SHOW";
     return "DESCONOCIDO";
+  }
+
+  private void validarUsuarioSinReservaActivaEnElDia(
+    Integer idUsuario,
+    LocalDateTime fechaHoraInicio
+  ) {
+    LocalDateTime inicioDia = fechaHoraInicio.toLocalDate().atStartOfDay();
+    LocalDateTime finDia = inicioDia.plusDays(1);
+
+    Long cantidadReservasActivas = reservaRepository.contarReservasActivasDelUsuarioEnElDia(
+      idUsuario,
+      inicioDia,
+      finDia
+    );
+
+    if (cantidadReservasActivas > 0) {
+      throw new RuntimeException("El usuario ya tiene una reserva activa para ese día.");
+    }
   }
 }

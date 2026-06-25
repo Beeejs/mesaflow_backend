@@ -47,4 +47,18 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
       @Param("fechaHoraInicio") LocalDateTime fechaHoraInicio,
       @Param("fechaHoraFin") LocalDateTime fechaHoraFin
     );
+
+    @Query("""
+      SELECT COUNT(r)
+      FROM Reserva r
+      WHERE r.usuario.idUsuario = :idUsuario
+      AND r.estado IN (0, 1)
+      AND r.fechaHoraInicio >= :inicioDia
+      AND r.fechaHoraInicio < :finDia
+    """)
+    Long contarReservasActivasDelUsuarioEnElDia(
+      @Param("idUsuario") Integer idUsuario,
+      @Param("inicioDia") LocalDateTime inicioDia,
+      @Param("finDia") LocalDateTime finDia
+    );
 }
