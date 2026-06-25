@@ -2,6 +2,7 @@ package com.mesaflow.mesaflow_api.Service;
 
 import com.mesaflow.mesaflow_api.DTOs.AccionReservaRequest;
 import com.mesaflow.mesaflow_api.DTOs.AccionReservaResponse;
+import com.mesaflow.mesaflow_api.DTOs.ConsultarReservasRequest;
 import com.mesaflow.mesaflow_api.DTOs.CrearReservaRequest;
 import com.mesaflow.mesaflow_api.DTOs.ReservaResponse;
 import com.mesaflow.mesaflow_api.Model.Establecimiento;
@@ -46,6 +47,29 @@ public class ReservaService {
     this.establecimientoService = establecimientoService;
     this.reservaConfiguracionService = reservaConfiguracionService;
     this.mesaService = mesaService;
+  }
+
+  // Metodo que nos evita repetir el constructor gigante cada vez que listamos reservas
+  private ReservaResponse armarReservaResponse(Reserva reserva) {
+    List<String> codigosMesasAsignadas = reservaMesaRepository
+      .findByReserva_IdReserva(reserva.getIdReserva())
+      .stream()
+      .map(reservaMesa -> reservaMesa.getMesa().getCodigo())
+      .toList();
+
+    return new ReservaResponse(
+      reserva.getIdReserva(),
+      reserva.getUsuario().getIdUsuario(),
+      reserva.getUsuario().getNombre() + " " + reserva.getUsuario().getApellido(),
+      reserva.getEstablecimiento().getIdEstablecimiento(),
+      reserva.getEstablecimiento().getNombre(),
+      reserva.getFechaHoraInicio(),
+      reserva.getFechaHoraFinCalculada(),
+      reserva.getComensales(),
+      reserva.getEstado(),
+      obtenerDescripcionEstado(reserva.getEstado()),
+      codigosMesasAsignadas
+    );
   }
 
   // Crear Reserva
@@ -145,6 +169,43 @@ public class ReservaService {
     if (estado == 3) return EstadoReserva.NO_SHOW.name();
 
     return "DESCONOCIDO";
+  }
+
+  // Metodo privado para obtener el codigo del estado de la reserva
+  private Integer obtenerCodigoEstado(EstadoReserva estadoReserva) {
+    if (estadoReserva == EstadoReserva.PENDIENTE) return 0;
+    if (estadoReserva == EstadoReserva.CONFIRMADA) return 1;
+    if (estadoReserva == EstadoReserva.CANCELADA) return 2;
+    if (estadoReserva == EstadoReserva.NO_SHOW) return 3;
+
+    throw new RuntimeException("El estado de reserva indicado no es válido.");
+  }
+
+  // Metodo privado para obtener el estado de la reserva desde el filtro
+  private Integer obtenerEstadoDesdeFiltro(ConsultarReservasRequest.Filtro filtro) {
+    // Validamos que el filtro de estado no sea null
+    if (filtro == null || filtro.getEstado() == null || filtro.getEstado().trim().isEmpty()) {
+      return null;
+    }
+
+    // Normalizamos el estado a mayúsculas y sin espacios para evitar errores de comparación
+    String estadoNormalizado = filtro.getEstado().trim().toUpperCase();
+
+    // Si el estado es "TODAS", devolvemos null para indicar que no se filtrará por estado
+    if ("TODAS".equals(estadoNormalizado)) {
+      return null;
+    }
+
+    EstadoReserva estadoReserva;
+
+    // Intentamos convertir el estado normalizado a un valor del enum EstadoReserva. Si no es válido, lanzamos una excepción.
+    try {
+      estadoReserva = EstadoReserva.valueOf(estadoNormalizado);
+    } catch (IllegalArgumentException e) {
+      throw new RuntimeException("El filtro de estado indicado no es válido.");
+    }
+
+    return obtenerCodigoEstado(estadoReserva);
   }
 
   // Metodo para validar que el usuario no tenga otra reserva activa en el mismo día
@@ -284,5 +345,86 @@ public class ReservaService {
     }
 
     throw new RuntimeException("La acción indicada no es válida.");
+  }
+
+  // Metodo para consultar reservas por establecimiento y filtro de estado
+  public List<ReservaResponse> consultarReservasPorEstablecimiento(
+    ConsultarReservasRequest request
+  ) {
+    if (request.getIdEstablecimiento() == null) {
+      throw new RuntimeException("Debe indicar el establecimiento.");
+    }
+    
+    // Validar que el usuario sea administrador del establecimiento
+    usuarioService.validarAdminDelEstablecimiento(
+      request.getIdUsuarioSolicitante(),
+      request.getIdEstablecimiento()
+    );
+
+    Integer estado = obtenerEstadoDesdeFiltro(request.getFiltro());
+
+    List<Reserva> reservas;
+
+    // Si el filtro de estado es nulo, consultar todas las reservas. Sino por estado.
+    if (estado == null) {
+      reservas = reservaRepository
+        .findByEstablecimiento_IdEstablecimientoOrderByFechaHoraInicioDesc(
+          request.getIdEstablecimiento()
+        );
+    } else {
+      reservas = reservaRepository
+        .findByEstablecimiento_IdEstablecimientoAndEstadoOrderByFechaHoraInicioDesc(
+          request.getIdEstablecimiento(),
+          estado
+        );
+    }
+
+    return reservas.stream()
+      .map(this::armarReservaResponse)
+      .toList();
+  }
+
+  // Metodo para consultar reservas por usuario
+  public List<ReservaResponse> consultarReservasPorUsuario(
+    ConsultarReservasRequest request
+  ) {
+    if (request.getIdUsuario() == null) {
+      throw new RuntimeException("Debe indicar el usuario a consultar.");
+    }
+
+    // Validar amos usuarios existan y estén activos
+    Usuario usuarioSolicitante = usuarioService.validarUsuarioActivo(
+      request.getIdUsuarioSolicitante()
+    );
+    
+    Usuario usuarioConsultado = usuarioService.validarUsuarioActivo(
+      request.getIdUsuario()
+    );
+    
+    // Validar que el usuario sea el mismo que se consulta
+    if (!usuarioSolicitante.getIdUsuario().equals(usuarioConsultado.getIdUsuario())) {
+      throw new RuntimeException("El usuario solo puede consultar sus propias reservas.");
+    }
+
+    Integer estado = obtenerEstadoDesdeFiltro(request.getFiltro());
+
+    List<Reserva> reservas;
+
+    if (estado == null) {
+      reservas = reservaRepository
+        .findByUsuario_IdUsuarioOrderByFechaHoraInicioDesc(
+          request.getIdUsuario()
+        );
+    } else {
+      reservas = reservaRepository
+        .findByUsuario_IdUsuarioAndEstadoOrderByFechaHoraInicioDesc(
+          request.getIdUsuario(),
+          estado
+        );
+    }
+
+    return reservas.stream()
+      .map(this::armarReservaResponse)
+      .toList();
   }
 }

@@ -20,6 +20,16 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer> {
       LocalDateTime fechaHasta
     );
 
+    List<Reserva> findByUsuario_IdUsuarioAndEstadoOrderByFechaHoraInicioDesc(
+      Integer idUsuario,
+      Integer estado
+    );
+
+    List<Reserva> findByEstablecimiento_IdEstablecimientoAndEstadoOrderByFechaHoraInicioDesc(
+      Integer idEstablecimiento,
+      Integer estado
+    );
+
     @Query("""
       SELECT r
       FROM Reserva r
