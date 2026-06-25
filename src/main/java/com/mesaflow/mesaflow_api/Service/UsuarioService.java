@@ -42,7 +42,7 @@ public class UsuarioService {
 
     // Verificar si el usuario tiene el rol de administrador del establecimiento
     if (!"ADMIN_ESTABLECIMIENTO".equals(usuario.getRol())) {
-      throw new RuntimeException("El usuario no tiene permisos para confirmar reservas.");
+      throw new RuntimeException("El usuario no tiene permisos para gestionar reservas de establecimientos.");
     }
 
     // Verificar si el usuario es administrador del establecimiento

@@ -1,5 +1,6 @@
 package com.mesaflow.mesaflow_api.Service;
 
+import com.mesaflow.mesaflow_api.Model.Reserva;
 import com.mesaflow.mesaflow_api.Model.ReservaConfiguracion;
 import com.mesaflow.mesaflow_api.Repository.MesaRepository;
 import com.mesaflow.mesaflow_api.Repository.ReservaConfiguracionRepository;
@@ -117,5 +118,36 @@ public class ReservaConfiguracionService {
 
     entonces rechaza la reserva.
     */
+  }
+
+  // Metodo para validar el tiempo límite de cancelación
+  public void validarCancelacionPermitida(
+    Reserva reserva,
+    ReservaConfiguracion configuracion
+  ) {
+    // Validar si el establecimiento permite cancelaciones
+    if (!Boolean.TRUE.equals(configuracion.getPermiteCancelacion())) {
+      throw new RuntimeException("El establecimiento no permite cancelar reservas.");
+    }
+
+    // Obtenemos el tiempo límite de cancelación en minutos desde la configuración
+    Integer tiempoLimiteCancelacionMinutos = configuracion.getTiempoLimiteCancelacionMinutos();
+
+    // Si el tiempo límite de cancelación es nulo, lanzar excepción
+    if (tiempoLimiteCancelacionMinutos == null) {
+      throw new RuntimeException("El establecimiento no tiene configurado el tiempo límite de cancelación.");
+    }
+
+    // Obtenemos la fecha y hora de inicio de la reserva
+    LocalDateTime fechaHoraLimiteCancelacion = reserva.getFechaHoraInicio()
+      .minusMinutes(tiempoLimiteCancelacionMinutos);
+
+    // Obtenemos la fecha y hora actual
+    LocalDateTime ahora = LocalDateTime.now();
+
+    // Validar si la reserva ya superó el tiempo límite de cancelación
+    if (ahora.isAfter(fechaHoraLimiteCancelacion)) {
+      throw new RuntimeException("La reserva ya no puede cancelarse porque superó el tiempo límite de cancelación.");
+    }
   }
 }

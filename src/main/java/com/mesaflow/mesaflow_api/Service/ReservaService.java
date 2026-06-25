@@ -164,9 +164,36 @@ public class ReservaService {
     }
   }
 
+  // Metodo para validar si el usuario tiene permiso para cancelar la reserva
+  private void validarPermisoCancelacion(Usuario usuario, Reserva reserva) {
+    // Si es cliente, solo puede cancelar sus propias reservas
+    if ("CLIENTE".equals(usuario.getRol())) {
+      boolean esReservaPropia = reserva.getUsuario()
+        .getIdUsuario()
+        .equals(usuario.getIdUsuario());
+
+      if (!esReservaPropia) {
+        throw new RuntimeException("El cliente solo puede cancelar sus propias reservas.");
+      }
+
+      return;
+    }
+
+    // Si es administrador de establecimiento, debe ser admin del establecimiento de la reserva
+    if ("ADMIN_ESTABLECIMIENTO".equals(usuario.getRol())) {
+      usuarioService.validarAdminDelEstablecimiento(
+        usuario.getIdUsuario(),
+        reserva.getEstablecimiento().getIdEstablecimiento()
+      );
+
+      return;
+    }
+
+    // Otros roles no pueden cancelar
+    throw new RuntimeException("El usuario no tiene permisos para cancelar reservas.");
+  }
+  
   // Metodo para confirmar una reserva (solo para administradores del establecimiento)
-  @Transactional // Asegura que todas las operaciones dentro del método se ejecuten como una sola transacción, evitando inconsistencias en la base de datos
-  // Lo ponemos en publico para que aplique el @Transactional y no de error de proxy
   public AccionReservaResponse confirmarReserva(Integer idReserva, Integer idUsuario) {
     // Validar que la reserva exista
     Reserva reserva = reservaRepository.findById(idReserva)
@@ -196,7 +223,50 @@ public class ReservaService {
     );
   }
 
+  // Metodo para cancelar una reserva
+  private AccionReservaResponse cancelarReserva(Integer idReserva, Integer idUsuario) {
+    // Validar que la reserva exista
+    Reserva reserva = reservaRepository.findById(idReserva)
+      .orElseThrow(() -> new RuntimeException("La reserva no existe."));
+
+    // Validar que el usuario exista y esté activo
+    Usuario usuario = usuarioService.validarUsuarioActivo(idUsuario);
+
+    // Validar permisos para cancelar la reserva
+    validarPermisoCancelacion(usuario, reserva);
+
+    // Obtener configuración activa del establecimiento de la reserva
+    ReservaConfiguracion configuracion = reservaConfiguracionService
+    .obtenerConfiguracionActiva(
+      reserva.getEstablecimiento().getIdEstablecimiento()
+    );
+
+    // Validar que la reserva esté en un estado cancelable
+    if (reserva.getEstado() != 0 && reserva.getEstado() != 1) {
+      throw new RuntimeException("Solo se pueden cancelar reservas pendientes o confirmadas.");
+    }
+
+    // Validar tiempo límite de cancelación
+    reservaConfiguracionService.validarCancelacionPermitida(
+      reserva,
+      configuracion
+    );
+
+    // Cambiar estado a cancelada
+    reserva.setEstado(2); // 2 = CANCELADA
+
+    // Actualizar reserva
+    Reserva reservaGuardada = reservaRepository.save(reserva);
+
+    return new AccionReservaResponse(
+      reservaGuardada.getIdReserva(),
+      reservaGuardada.getEstado(),
+      obtenerDescripcionEstado(reservaGuardada.getEstado())
+    );
+  }
+
   // Metodo para ejecutar acciones sobre una reserva (confirmar, cancelar)
+  @Transactional // Asegura que todas las operaciones dentro del método se ejecuten como una sola transacción, evitando inconsistencias en la base de datos
   public AccionReservaResponse ejecutarAccionReserva(
     Integer idReserva,
     AccionReservaRequest request
@@ -205,6 +275,10 @@ public class ReservaService {
 
     if ("CONFIRMAR".equals(scope)) {
       return confirmarReserva(idReserva, request.getIdUsuario());
+    }
+
+    if ("CANCELAR".equals(scope)) {
+      return cancelarReserva(idReserva, request.getIdUsuario());
     }
 
     throw new RuntimeException("La acción indicada no es válida.");
