@@ -48,7 +48,7 @@ public class ReservaController {
 
     return ResponseEntity.ok(ApiResponse.ok(reservaActualizada));
   }
-
+  // Consultar reservas por establecimiento
   @PostMapping("/consultar/establecimiento")
   public ResponseEntity<ApiResponse<List<ReservaResponse>>> consultarReservasPorEstablecimiento(
     @Valid @RequestBody ConsultarReservasRequest request
@@ -58,6 +58,7 @@ public class ReservaController {
     return ResponseEntity.ok(ApiResponse.ok(reservas));
   }
 
+  // Consultar reservas por usuario
   @PostMapping("/consultar/usuario")
   public ResponseEntity<ApiResponse<List<ReservaResponse>>> consultarReservasPorUsuario(
     @Valid @RequestBody ConsultarReservasRequest request
